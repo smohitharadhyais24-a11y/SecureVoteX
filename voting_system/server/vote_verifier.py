@@ -9,6 +9,7 @@ from config.config import DEFAULT_SOURCE_IP, SHA256_SECRET_SALT, VALID_CANDIDATE
 from security.hashing import verify_hmac_signature
 from server.database import (
     get_voter_by_rfid,
+    get_dashboard_statistics,
     record_audit_log,
     record_vote,
     set_voter_as_voted,
@@ -17,6 +18,7 @@ from server.database import (
     booth_exists,
     get_election_status,
 )
+from server.socketio_handler import emit_dashboard_update, emit_new_vote
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +196,11 @@ def process_vote(payload: dict[str, Any], ip_address: str | None = None, db_path
             source_ip,
             db_path,
         )
+        try:
+            emit_new_vote({"vote_id": vote_id, "voter_id": payload["voter_id"], "candidate": payload["candidate"], "booth_id": payload["booth_id"]})
+            emit_dashboard_update(get_dashboard_statistics(db_path=db_path))
+        except Exception:
+            logger.exception("Failed to emit realtime dashboard updates")
         logger.info("Accepted vote_id=%s for voter_id=%s", vote_id, payload["voter_id"])
         return {
             "status": "accepted",

@@ -11,11 +11,14 @@ import logging
 from typing import Any
 
 from flask import Flask
-from flask_socketio import SocketIO
+try:  # pragma: no cover - optional dependency during some test envs
+    from flask_socketio import SocketIO
+except Exception:  # pragma: no cover
+    SocketIO = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
-socketio: SocketIO | None = None
+socketio: Any = None
 
 
 def init_socketio(app: Flask, async_mode: str | None = None) -> SocketIO:
@@ -29,6 +32,9 @@ def init_socketio(app: Flask, async_mode: str | None = None) -> SocketIO:
         The created SocketIO instance.
     """
     global socketio
+    if SocketIO is None:
+        logger.warning("flask-socketio is not installed; realtime emits are disabled")
+        return None  # type: ignore[return-value]
     if socketio is None:
         socketio = SocketIO(app, async_mode=async_mode)
         logger.info("SocketIO initialized with async_mode=%s", async_mode)

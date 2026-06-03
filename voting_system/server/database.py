@@ -61,6 +61,10 @@ def initialize_database(db_path: str | Path | None = None, schema_path: str | Pa
         schema_sql = resolved_schema_path.read_text(encoding="utf-8")
         with closing(get_connection(resolved_db_path)) as connection:
             connection.executescript(schema_sql)
+            # Lightweight migration path for older Phase 1 DBs.
+            audit_columns = {row["name"] for row in connection.execute("PRAGMA table_info(audit_log)").fetchall()}
+            if "severity" not in audit_columns:
+                connection.execute("ALTER TABLE audit_log ADD COLUMN severity TEXT DEFAULT 'INFO'")
             connection.commit()
         logger.info("Database initialized at %s", resolved_db_path)
     except Exception:

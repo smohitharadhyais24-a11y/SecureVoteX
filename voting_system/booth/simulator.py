@@ -10,10 +10,11 @@ from colorama import Fore, Style, init as colorama_init
 from tabulate import tabulate
 
 from booth.fingerprint_simulator import simulate_fingerprint_attempt
+from booth.mqtt_client import BoothMqttClient
 from booth.rfid_simulator import format_voter_menu, get_voter_by_choice, list_registered_voters, simulate_rfid_scan
 from booth.vote_sender import send_vote_payload
 from booth.offline_buffer import get_offline_buffer
-from config.config import BOOTH_ID, CANDIDATE_NAMES, DEFAULT_SOURCE_IP, MAX_FINGERPRINT_ATTEMPTS
+from config.config import BOOTH_ID, CANDIDATE_NAMES, DEFAULT_SOURCE_IP, MAX_FINGERPRINT_ATTEMPTS, NETWORK_MODE
 from security.hashing import generate_payload
 from server.database import get_voter_by_rfid, record_audit_log, set_voter_as_voted
 from server.vote_verifier import process_vote
@@ -154,6 +155,34 @@ def run_valid_voter_flow(db_path: str | None = None) -> None:
     Returns:
         None.
     """
+    if NETWORK_MODE == "MQTT":
+        mqtt_client = BoothMqttClient(booth_id=BOOTH_ID)
+        if not mqtt_client.connect():
+            print("[SYSTEM] MQTT connection unavailable. Cannot run MQTT auth flow.")
+            return
+        try:
+            rfid = input("Enter RFID (for MQTT auth): ").strip()
+            simulate_rfid_scan(rfid)
+            auth = mqtt_client.authenticate_rfid(rfid)
+            if not auth.get("registered"):
+                print("[SERVER] RFID not registered")
+                return
+
+            fp_raw = input("Enter fingerprint ID: ").strip()
+            fingerprint_id = int(fp_raw)
+            fp_auth = mqtt_client.authenticate_fingerprint(rfid, fingerprint_id)
+            if not fp_auth.get("verified"):
+                print("[SERVER] Fingerprint verification failed")
+                return
+
+            candidate = _choose_candidate()
+            payload = generate_payload(rfid, candidate, BOOTH_ID)
+            result = mqtt_client.submit_vote(payload)
+            print(f"[SERVER] {result.get('message', 'No response message')}")
+            return
+        finally:
+            mqtt_client.disconnect()
+
     voters = list_registered_voters(db_path)
     voter = _choose_voter(voters)
     candidate = _choose_candidate()
@@ -356,6 +385,11 @@ def main() -> None:
     # Start offline buffer retry loop
     offline_buf = get_offline_buffer()
     offline_buf.start()
+    mqtt_client: BoothMqttClient | None = None
+    if NETWORK_MODE == "MQTT":
+        mqtt_client = BoothMqttClient(booth_id=BOOTH_ID)
+        if mqtt_client.connect():
+            mqtt_client.start_heartbeat()
 
     while True:
         print_menu()
@@ -378,6 +412,8 @@ def main() -> None:
             print("Network mode toggled. Now:", "Online" if NETWORK_ONLINE else "Offline")
         elif choice == "0":
             print("Exiting booth simulator.")
+            if mqtt_client is not None:
+                mqtt_client.disconnect()
             break
         else:
             print("Invalid choice. Please select a number from the menu.")
