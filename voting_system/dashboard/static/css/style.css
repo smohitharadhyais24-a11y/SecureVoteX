@@ -1,149 +1,272 @@
-:root {
-    --bg: #09111f;
-    --panel: rgba(16, 26, 44, 0.88);
-    --panel-border: rgba(127, 166, 255, 0.18);
-    --text: #edf3ff;
-    --muted: #9fb0cc;
-    --accent: #4dd6a4;
-    --accent-2: #5ea0ff;
-    --danger: #ff6b6b;
-}
+/* Premium Dark Mode Stylesheet for SecureVoteX™ Commercial Platform */
 
-* {
-    box-sizing: border-box;
+:root {
+    --bg: #080E1A;
+    --card: rgba(17, 24, 39, 0.7);
+    --border: rgba(255, 255, 255, 0.08);
+    --accent: #3B82F6;
+    --success: #10B981;
+    --warning: #F59E0B;
+    --danger: #EF4444;
+    --text: #F9FAFB;
+    --muted: #9CA3AF;
 }
 
 body {
-    margin: 0;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    color: var(--text);
-    background:
-        radial-gradient(circle at top left, rgba(94, 160, 255, 0.22), transparent 34%),
-        radial-gradient(circle at top right, rgba(77, 214, 164, 0.18), transparent 26%),
-        linear-gradient(160deg, #07101d 0%, #0b1730 50%, #07101d 100%);
-    min-height: 100vh;
+    background-color: var(--bg);
+    background-image: 
+        radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 45%),
+        radial-gradient(circle at 50% 50%, rgba(239, 68, 68, 0.02) 0%, transparent 35%);
+    background-attachment: fixed;
+    background-size: cover;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-.shell {
-    width: min(1120px, calc(100% - 32px));
-    margin: 0 auto;
-    padding: 40px 0 56px;
+/* Glassmorphism Panel styles */
+.glass-panel {
+    background: rgba(13, 20, 35, 0.65);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(20px) saturate(120%);
+    -webkit-backdrop-filter: blur(20px) saturate(120%);
+    border-radius: 16px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.hero {
-    padding: 24px 0 18px;
+.glass-panel:hover {
+    border-color: rgba(59, 130, 246, 0.25);
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5), 0 0 1px rgba(59, 130, 246, 0.15);
 }
 
-.eyebrow {
-    margin: 0 0 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    color: var(--accent);
-    font-size: 0.78rem;
+/* Stats Cards */
+.stat-card {
+    background: rgba(13, 20, 35, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-h1 {
-    margin: 0;
-    font-size: clamp(2.2rem, 4vw, 4rem);
-    line-height: 1.05;
+.stat-card:hover {
+    border-color: rgba(59, 130, 246, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
 }
 
-.subtitle {
-    max-width: 720px;
-    color: var(--muted);
-    font-size: 1.02rem;
-    margin: 14px 0 0;
-}
-
-.cards {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-    margin: 26px 0;
-}
-
-.card, .panel {
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    backdrop-filter: blur(12px);
-    border-radius: 20px;
-    box-shadow: 0 24px 72px rgba(0, 0, 0, 0.28);
-}
-
-.card {
-    padding: 18px 20px;
-    min-height: 120px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.card span, .panel h2 {
-    color: var(--muted);
-}
-
-.card strong {
-    font-size: 2.4rem;
-}
-
-.card.accent {
-    border-color: rgba(77, 214, 164, 0.35);
-    box-shadow: 0 24px 72px rgba(77, 214, 164, 0.08);
-}
-
-.panel {
-    padding: 20px;
-    margin-top: 16px;
-}
-
-.panel h2 {
-    margin: 0 0 14px;
-    font-size: 1rem;
+/* Panel Title */
+.panel-title {
+    font-size: 0.75rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.12em;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
 }
 
-.grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 12px;
+/* Custom Scrollbar Styles for live log terminal */
+.scrollbar-style::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
 }
 
-.tally {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
-    padding: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+.scrollbar-style::-webkit-scrollbar-track {
+    background: #050913;
+    border-radius: 8px;
 }
 
-.tally strong {
-    display: block;
-    font-size: 1.6rem;
-    margin-top: 6px;
+.scrollbar-style::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.25);
+    border-radius: 8px;
+    transition: background 0.3s;
 }
 
-.timeline {
-    display: grid;
-    gap: 12px;
+.scrollbar-style::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.5);
 }
 
-.event {
-    border-left: 3px solid var(--accent-2);
-    padding: 12px 14px;
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 14px;
-}
-
-.event small {
-    color: var(--muted);
-}
-
-.event.danger {
-    border-left-color: var(--danger);
-}
-
-@media (max-width: 780px) {
-    .cards {
-        grid-template-columns: 1fr;
+/* Animated status indicator dots */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
     }
+    50% {
+        opacity: 0.4;
+        transform: scale(0.9);
+    }
+}
+
+.pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Custom badges */
+.badge-blue {
+    background: rgba(59, 130, 246, 0.1);
+    color: #60A5FA;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 9999px;
+}
+
+.badge-green {
+    background: rgba(16, 185, 129, 0.1);
+    color: #34D399;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 9999px;
+}
+
+.badge-red {
+    background: rgba(239, 68, 68, 0.1);
+    color: #F87171;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 9999px;
+}
+
+/* Active sidebar nav item styling */
+.active-link {
+    background: rgba(59, 130, 246, 0.12) !important;
+    color: #3B82F6 !important;
+    border-left: 3px solid #3B82F6 !important;
+    border-top-left-radius: 0px !important;
+    border-bottom-left-radius: 0px !important;
+}
+
+/* Terminal Log Viewer adjustments */
+#terminal-log-viewer {
+    background-color: #030712;
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.8);
+    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+}
+
+.terminal-line {
+    line-height: 1.4;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+/* Presentation / Screen Projector Optimized view */
+body.fullscreen-mode {
+    background: #040814 !important;
+}
+
+body.fullscreen-mode aside {
+    display: none !important;
+}
+
+body.fullscreen-mode header {
+    padding: 12px 24px !important;
+    background: #040814 !important;
+}
+
+body.fullscreen-mode #command-center-welcome {
+    display: none !important;
+}
+
+body.fullscreen-mode footer {
+    display: none !important;
+}
+
+/* Hide admin section during presenter presentation */
+body.presentation-active button[onclick*="controlElection"],
+body.presentation-active button[onclick*="resetDemoData"],
+body.presentation-active button[id="btn-voter-prev"],
+body.presentation-active button[id="btn-voter-next"],
+body.presentation-active input,
+body.presentation-active select,
+body.presentation-active form {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+/* Smooth chart transition overlay */
+canvas {
+    transition: opacity 0.5s ease-in-out;
+}
+
+/* Tab Panel visibility fade transition helper */
+.tab-panel {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Visual timeline styles */
+#timeline-flow-list div::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 15px;
+    width: 2px;
+    height: 100%;
+    background: var(--border);
+    z-index: 0;
+}
+
+#timeline-flow-list div:last-child::before {
+    display: none;
+}
+
+/* System health page card indicator custom pulses */
+.health-indicator-circle {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+
+/* Scrolling Announcement Marquee */
+.marquee-container {
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+}
+
+.marquee-content {
+    display: inline-flex;
+    animation: marquee-scroll 35s linear infinite;
+    padding-left: 100%;
+}
+
+.marquee-content:hover {
+    animation-play-state: paused;
+}
+
+@keyframes marquee-scroll {
+    0% {
+        transform: translate3d(0, 0, 0);
+    }
+    100% {
+        transform: translate3d(-100%, 0, 0);
+    }
+}
+
+/* SVG Architecture Flow Line Animation */
+#crypto-flow-line {
+    stroke-dasharray: 8, 8;
+    animation: flow-dash 1.5s linear infinite;
+}
+
+@keyframes flow-dash {
+    to {
+        stroke-dashoffset: -16;
+    }
+}
+
+/* Heatmap Grid Enhancements */
+#security-heatmap-container svg rect {
+    transition: fill 0.5s ease, stroke 0.5s ease;
+}
+
+#security-heatmap-container svg text {
+    transition: fill 0.5s ease;
 }

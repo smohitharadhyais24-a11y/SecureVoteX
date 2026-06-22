@@ -7,7 +7,7 @@ from pathlib import Path
 
 from flask import Flask
 
-from config.config import FLASK_DEBUG, FLASK_HOST, FLASK_PORT, LOG_FILE_PATH, LOGGING_FORMAT, LOGGING_LEVEL
+from config.config import FLASK_DEBUG, FLASK_HOST, FLASK_PORT, LOG_FILE_PATH, LOGGING_FORMAT, LOGGING_LEVEL, SECRET_KEY
 from server.database import initialize_database
 from server.mqtt_handler import MQTTVoteHandler
 from server.routes import register_routes
@@ -50,6 +50,11 @@ def create_app() -> Flask:
         static_folder=str(dashboard_dir / "static"),
     )
     app.config["JSON_SORT_KEYS"] = False
+    app.config["SECRET_KEY"] = SECRET_KEY
+    # Disable CSRF checks during automated testing
+    app.config["WTF_CSRF_ENABLED"] = not app.config.get("TESTING", False)
+    from server.csrf_init import csrf
+    csrf.init_app(app)
     configure_file_logging(app)
     initialize_database()
     register_routes(app)
@@ -58,12 +63,34 @@ def create_app() -> Flask:
     return app
 
 
+def start_background_broadcast(flask_app) -> None:
+    import time
+    from server.socketio_handler import emit_dashboard_update
+    from server.routes import get_live_dashboard_stats
+    
+    # Run the broadcast loop in the app context to access routes and db
+    with flask_app.app_context():
+        while True:
+            try:
+                stats = get_live_dashboard_stats()
+                emit_dashboard_update(stats)
+            except Exception:
+                pass
+            time.sleep(2.5)
+
+
 app = create_app()
 
 
 if __name__ == "__main__":
     mqtt_handler = app.extensions.get("mqtt_handler")
     socketio = app.extensions.get("socketio")
+    
+    # Start the daemon broadcast thread
+    import threading
+    t = threading.Thread(target=start_background_broadcast, args=(app,), daemon=True)
+    t.start()
+    
     try:
         if isinstance(mqtt_handler, MQTTVoteHandler):
             mqtt_handler.start_mqtt_client()

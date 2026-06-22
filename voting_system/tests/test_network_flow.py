@@ -20,6 +20,7 @@ class TestNetworkFlow(unittest.TestCase):
         initialize_database(self.db_path)
         seed_demo_voters(self.db_path)
         self.app = create_app()
+        self.app.config["TESTING"] = True
         self.client = self.app.test_client()
 
     def tearDown(self) -> None:

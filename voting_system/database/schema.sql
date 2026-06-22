@@ -1,5 +1,14 @@
 PRAGMA foreign_keys = ON;
 
+CREATE TABLE IF NOT EXISTS candidates (
+    candidate_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    candidate_name TEXT NOT NULL,
+    party_name TEXT NOT NULL,
+    symbol_path TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS voters (
     rfid_id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -55,6 +64,7 @@ CREATE TABLE IF NOT EXISTS admins (
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

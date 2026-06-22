@@ -36,9 +36,9 @@ def main() -> None:
     logger.info("System ready: Flask + MQTT + SocketIO")
     try:
         if socketio is not None:
-            socketio.run(app, host="127.0.0.1", port=5000, debug=False)
+            socketio.run(app, host="0.0.0.0", port=5000, debug=False, allow_unsafe_werkzeug=True)
         else:
-            app.run(host="127.0.0.1", port=5000, debug=False)
+            app.run(host="0.0.0.0", port=5000, debug=False)
     finally:
         if isinstance(mqtt_handler, MQTTVoteHandler):
             mqtt_handler.stop_mqtt_client()

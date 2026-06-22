@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureVoteX™ - Public Election Results</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#060B16',
+                        darkcard: 'rgba(11, 18, 33, 0.75)',
+                        darkborder: 'rgba(255, 255, 255, 0.06)',
+                        accentblue: '#3B82F6',
+                        successgreen: '#10B981',
+                        warningyellow: '#F59E0B',
+                        textlight: '#F9FAFB',
+                        textmuted: '#9CA3AF'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <style>
+        body {
+            background-color: #060B16;
+            background-image: 
+                radial-gradient(circle at 5% 15%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 95% 85%, rgba(16, 185, 129, 0.06) 0%, transparent 45%);
+            background-attachment: fixed;
+            background-size: cover;
+        }
+        .glass-panel {
+            background: rgba(11, 18, 33, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
+            border-radius: 20px;
+        }
+        .text-glow {
+            text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        .text-glow-green {
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+        }
+        /* Scrolling Banner */
+        .marquee-container {
+            overflow: hidden;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+        }
+        .marquee-content {
+            display: inline-block;
+            animation: marquee 25s linear infinite;
+        }
+        @keyframes marquee {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+    </style>
+</head>
+<body class="bg-darkbg text-textlight font-sans min-h-screen flex flex-col justify-between selection:bg-accentblue selection:text-white">
+
+    <!-- Top Ribbon Banner -->
+    <div class="w-full bg-[#02050B] border-b border-darkborder py-2.5 px-4 overflow-hidden relative z-50">
+        <div class="marquee-container text-xs font-bold text-accentblue">
+            <div class="marquee-content flex gap-12">
+                <span><i class="fa-solid fa-circle-check text-successgreen mr-1.5 animate-pulse"></i> SECUREVOTEX™ PUBLIC RESULTS BROADCAST</span>
+                <span><i class="fa-solid fa-shield text-successgreen mr-1.5"></i> CRYPTOGRAPHIC DATA VERIFICATION ACTIVE</span>
+                <span><i class="fa-solid fa-lock text-successgreen mr-1.5"></i> TLS 1.2 MQTT ENCRYPTION ONLINE</span>
+                <span><i class="fa-solid fa-clock text-accentblue mr-1.5"></i> LIVE UPDATES VIA WEBSOCKETS</span>
+                <span><i class="fa-solid fa-user-shield text-accentblue mr-1.5"></i> PERSISTENT PERSISTED LEDGER SCHEMA</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="max-w-7xl mx-auto w-full px-6 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="h-11 w-11 rounded-2xl bg-accentblue/10 border border-accentblue/30 flex items-center justify-center text-accentblue">
+                <i class="fa-solid fa-shield-halved text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-extrabold tracking-tight text-white flex items-center">
+                    SecureVoteX<span class="text-accentblue font-medium text-xs align-super ml-0.5">™</span>
+                </h1>
+                <p class="text-[10px] text-textmuted uppercase tracking-widest font-semibold font-mono">Public Results Center</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-4 text-sm font-semibold">
+            <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-darkcard border border-darkborder">
+                <span class="h-2.5 w-2.5 rounded-full bg-successgreen animate-ping"></span>
+                <span class="text-textmuted">Status:</span>
+                <span id="election-status" class="text-successgreen font-mono uppercase">ACTIVE</span>
+            </div>
+            <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-darkcard border border-darkborder text-textmuted">
+                <i class="fa-solid fa-clock text-accentblue"></i>
+                <span id="live-time">--:--:--</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="max-w-7xl mx-auto w-full px-6 py-8 flex-grow grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Left: Leaderboard & Stats -->
+        <div class="lg:col-span-2 flex flex-col gap-6">
+            
+            <!-- Statistics Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="glass-panel p-5 bg-darkcard">
+                    <span class="text-[10px] text-textmuted block font-bold uppercase tracking-wider mb-1">Total Votes Recorded</span>
+                    <strong id="total-votes" class="text-3xl font-extrabold text-white font-mono text-glow">0</strong>
+                    <div class="text-[10px] text-textmuted mt-1"><i class="fa-solid fa-vote-yea text-successgreen mr-1"></i> Verified Tallies</div>
+                </div>
+                <div class="glass-panel p-5 bg-darkcard">
+                    <span class="text-[10px] text-textmuted block font-bold uppercase tracking-wider mb-1">Voter Turnout Rate</span>
+                    <strong id="turnout-rate" class="text-3xl font-extrabold text-white font-mono text-glow-green">0.00%</strong>
+                    <div class="text-[10px] text-textmuted mt-1"><i class="fa-solid fa-chart-line text-accentblue mr-1"></i> Percent Cast</div>
+                </div>
+                <div class="glass-panel p-5 bg-darkcard">
+                    <span class="text-[10px] text-textmuted block font-bold uppercase tracking-wider mb-1">Active Winner / Lead</span>
+                    <strong id="leading-candidate" class="text-3xl font-extrabold text-warningyellow font-mono truncate block">--</strong>
+                    <div class="text-[10px] text-textmuted mt-1"><i class="fa-solid fa-trophy text-warningyellow mr-1"></i> Top Contender</div>
+                </div>
+            </div>
+            
+            <!-- Leaderboard Rankings -->
+            <div class="glass-panel p-6 flex-grow flex flex-col justify-between">
+                <div>
+                    <h3 class="text-md font-bold text-white mb-4 uppercase tracking-wider"><i class="fa-solid fa-ranking-star text-accentblue mr-2"></i>Official Candidate Rankings</h3>
+                    <div class="space-y-4" id="leaderboard-container">
+                        <!-- Rankings loop -->
+                        <div class="text-center text-textmuted py-8"><i class="fa-solid fa-spinner animate-spin text-accentblue text-xl block mb-2"></i> Loading standings...</div>
+                    </div>
+                </div>
+                <div class="mt-4 border-t border-darkborder pt-4 text-center text-[10px] text-textmuted">
+                    Rankings update automatically upon cryptographic confirmation from verified voting booths.
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Animated Donut Chart -->
+        <div class="glass-panel p-6 flex flex-col items-center justify-between min-h-[400px]">
+            <div class="w-full">
+                <h3 class="text-md font-bold text-white mb-1 uppercase tracking-wider"><i class="fa-solid fa-chart-pie text-accentblue mr-2"></i>Vote Share Chart</h3>
+                <span class="text-[10px] text-textmuted block">Visual distribution of authenticated ballots</span>
+            </div>
+            
+            <div class="flex-grow flex items-center justify-center relative w-full h-[260px] my-6">
+                <canvas id="public-results-chart"></canvas>
+            </div>
+            
+            <div class="w-full flex items-center justify-center gap-4 text-xs font-mono">
+                <div class="flex items-center gap-1.5">
+                    <span class="h-3 w-3 rounded-full bg-blue-500"></span> Candidate A
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="h-3 w-3 rounded-full bg-emerald-500"></span> Candidate B
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="h-3 w-3 rounded-full bg-amber-500"></span> Candidate C
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="max-w-7xl mx-auto w-full px-6 py-6 border-t border-darkborder flex flex-col sm:flex-row items-center justify-between text-xs text-textmuted gap-2">
+        <p>&copy; 2026 SecureVoteX™. Public Board Display Mode.</p>
+        <p>Powered by IoT Secure Smart Voting System</p>
+    </footer>
+
+    <!-- Socket.IO & Chart.js scripts -->
+    <script>
+        let resultsChart = null;
+        const candidateNames = { 'A': 'Candidate A', 'B': 'Candidate B', 'C': 'Candidate C' };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initLiveResults();
+            
+            // Live clock
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('live-time').textContent = now.toLocaleTimeString();
+            }, 1000);
+        });
+
+        async function initLiveResults() {
+            try {
+                // Fetch initial
+                const response = await fetch('/api/results');
+                const data = await response.json();
+                updateUI(data);
+                
+                // Init Socket
+                const socket = io();
+                
+                socket.on('dashboard_update', (stats) => {
+                    updateUI(stats);
+                });
+            } catch (err) {
+                console.error('Failed to load public results:', err);
+            }
+        }
+
+        function updateUI(data) {
+            if (!data) return;
+            
+            const totalVotes = data.total_votes ?? data.total_votes_cast ?? 0;
+            document.getElementById('total-votes').textContent = totalVotes.toLocaleString();
+            
+            const turnout = data.turnout ?? 0.0;
+            document.getElementById('turnout-rate').textContent = `${turnout.toFixed(2)}%`;
+            
+            if (data.election_status) {
+                const statusBadge = document.getElementById('election-status');
+                statusBadge.textContent = data.election_status;
+                if (data.election_status === 'ACTIVE') {
+                    statusBadge.className = 'text-successgreen font-mono uppercase';
+                    statusBadge.previousElementSibling.className = 'h-2.5 w-2.5 rounded-full bg-successgreen animate-ping';
+                } else if (data.election_status === 'PAUSED') {
+                    statusBadge.className = 'text-warningyellow font-mono uppercase';
+                    statusBadge.previousElementSibling.className = 'h-2.5 w-2.5 rounded-full bg-warningyellow animate-pulse';
+                } else {
+                    statusBadge.className = 'text-red-500 font-mono uppercase';
+                    statusBadge.previousElementSibling.className = 'h-2.5 w-2.5 rounded-full bg-red-500';
+                }
+            }
+
+            const candidateCounts = data.candidate_counts || { 'A': 0, 'B': 0, 'C': 0 };
+            
+            // Re-render chart
+            updateChart(candidateCounts);
+            
+            // Leaderboard and Winner calculations
+            const sortedCandidates = Object.keys(candidateCounts).map(k => ({
+                id: k,
+                name: candidateNames[k] || `Candidate ${k}`,
+                count: candidateCounts[k]
+            })).sort((a, b) => b.count - a.count);
+            
+            const leadText = totalVotes > 0 ? sortedCandidates[0].name : '--';
+            document.getElementById('leading-candidate').textContent = leadText;
+            
+            // Build ranking cards html
+            const container = document.getElementById('leaderboard-container');
+            let html = '';
+            
+            sortedCandidates.forEach((cand, idx) => {
+                const pct = totalVotes > 0 ? (cand.count / totalVotes * 100) : 0.0;
+                
+                const medalColors = [
+                    'text-warningyellow shadow-warningyellow/10 bg-warningyellow/5 border-warningyellow/20', 
+                    'text-gray-300 shadow-gray-300/10 bg-gray-300/5 border-gray-300/20', 
+                    'text-amber-600 shadow-amber-600/10 bg-amber-600/5 border-amber-600/20'
+                ];
+                const medalIcon = idx === 0 ? '<i class="fa-solid fa-trophy text-sm"></i>' : `<span class="font-mono text-sm">#${idx+1}</span>`;
+                const progressColor = idx === 0 ? 'bg-accentblue' : (idx === 1 ? 'bg-successgreen' : 'bg-warningyellow');
+                
+                html += `
+                <div class="p-4 rounded-2xl bg-darkcard border border-darkborder flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-3.5 min-w-0">
+                        <div class="h-9 w-9 rounded-xl border flex items-center justify-center ${medalColors[idx] || 'text-textmuted border-darkborder'}">
+                            ${medalIcon}
+                        </div>
+                        <div class="min-w-0">
+                            <strong class="text-white block font-bold text-sm">${cand.name}</strong>
+                            <div class="flex items-center gap-2 mt-1">
+                                <div class="w-32 bg-darkbg border border-darkborder rounded-full h-1.5">
+                                    <div class="${progressColor} h-1.5 rounded-full" style="width: ${pct}%"></div>
+                                </div>
+                                <span class="text-[10px] text-textmuted font-mono">${pct.toFixed(1)}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="block text-white font-extrabold font-mono text-base">${cand.count.toLocaleString()}</span>
+                        <span class="block text-[9px] text-textmuted uppercase font-semibold">Votes Confirmed</span>
+                    </div>
+                </div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function updateChart(counts) {
+            const canvas = document.getElementById('public-results-chart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const labels = ['Candidate A', 'Candidate B', 'Candidate C'];
+            const voteData = [counts['A'] || 0, counts['B'] || 0, counts['C'] || 0];
+            
+            const chartColors = [
+                'rgba(59, 130, 246, 0.85)',
+                'rgba(16, 185, 129, 0.85)',
+                'rgba(245, 158, 11, 0.85)'
+            ];
+            
+            if (resultsChart) {
+                resultsChart.data.datasets[0].data = voteData;
+                resultsChart.update();
+            } else {
+                resultsChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: voteData,
+                            backgroundColor: chartColors,
+                            borderColor: 'rgba(255, 255, 255, 0.08)',
+                            borderWidth: 1.5,
+                            hoverBackgroundColor: ['#3B82F6', '#10B981', '#F59E0B']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        cutout: '72%'
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>

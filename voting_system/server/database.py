@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+import hashlib
+import bcrypt
 from contextlib import closing
 from pathlib import Path
 from typing import Any
@@ -65,6 +67,10 @@ def initialize_database(db_path: str | Path | None = None, schema_path: str | Pa
             audit_columns = {row["name"] for row in connection.execute("PRAGMA table_info(audit_log)").fetchall()}
             if "severity" not in audit_columns:
                 connection.execute("ALTER TABLE audit_log ADD COLUMN severity TEXT DEFAULT 'INFO'")
+            
+            admin_columns = {row["name"] for row in connection.execute("PRAGMA table_info(admins)").fetchall()}
+            if "status" not in admin_columns:
+                connection.execute("ALTER TABLE admins ADD COLUMN status TEXT DEFAULT 'ACTIVE'")
             connection.commit()
         logger.info("Database initialized at %s", resolved_db_path)
     except Exception:
@@ -261,6 +267,23 @@ def record_audit_log(
             connection.commit()
             log_id = int(cursor.lastrowid)
             logger.info("Recorded audit event %s for rfid_id=%s", event_type, rfid_id)
+            
+            # Emit live audit log event via Socket.IO
+            try:
+                from server.socketio_handler import socketio
+                if socketio is not None:
+                    socketio.emit("new_audit_log", {
+                        "log_id": log_id,
+                        "event_type": event_type,
+                        "rfid_id": rfid_id,
+                        "details": details,
+                        "timestamp": timestamp,
+                        "ip_address": ip_address,
+                        "severity": severity
+                    })
+            except Exception:
+                pass
+                
             return log_id
     except Exception:
         logger.exception("Failed to record audit event %s", event_type)
@@ -353,14 +376,44 @@ def create_admin(username: str, password_hash: str, role: str = "ELECTION_OFFICE
         raise
 
 
-def authenticate_admin(username: str, password_hash: str, db_path: str | Path | None = None) -> bool:
-    """Authenticate an admin by username and password hash."""
+def authenticate_admin(username: str, password_raw_or_hash: str, db_path: str | Path | None = None) -> bool:
+    """Authenticate an admin by username and password (supports SHA-256 and bcrypt)."""
     try:
         with closing(get_connection(db_path)) as connection:
-            row = connection.execute("SELECT password_hash FROM admins WHERE username = ?", (username,)).fetchone()
+            row = connection.execute("SELECT password_hash, status FROM admins WHERE username = ?", (username,)).fetchone()
             if row is None:
                 return False
-            return hmac_compare(password_hash, row["password_hash"])
+            
+            # Check if account is active
+            if row["status"] != "ACTIVE":
+                logger.warning("Authentication blocked for inactive admin %s", username)
+                return False
+                
+            stored_hash = row["password_hash"]
+            
+            # Case 1: Stored hash is legacy SHA-256 (64 hex characters)
+            if len(stored_hash) == 64 and not stored_hash.startswith("$"):
+                input_sha256 = password_raw_or_hash
+                if len(password_raw_or_hash) != 64:
+                    input_sha256 = hashlib.sha256(password_raw_or_hash.encode("utf-8")).hexdigest()
+                
+                if hmac_compare(input_sha256, stored_hash):
+                    # Migrate to bcrypt using the raw password if provided, or fallback to hashing the sha256 hash
+                    raw_password = password_raw_or_hash
+                    new_bcrypt_hash = bcrypt.hashpw(raw_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+                    connection.execute("UPDATE admins SET password_hash = ? WHERE username = ?", (new_bcrypt_hash, username))
+                    connection.commit()
+                    logger.info("Migrated admin '%s' password to bcrypt", username)
+                    return True
+                return False
+                
+            # Case 2: Stored hash is bcrypt
+            try:
+                # If password_raw_or_hash is legacy SHA-256 hash, we can try to compare (legacy tests)
+                raw_password = password_raw_or_hash
+                return bcrypt.checkpw(raw_password.encode("utf-8"), stored_hash.encode("utf-8"))
+            except Exception:
+                return False
     except Exception:
         logger.exception("Failed to authenticate admin %s", username)
         raise
@@ -505,3 +558,174 @@ def get_recent_audit_logs(limit: int = 20, db_path: str | Path | None = None) ->
     except Exception:
         logger.exception("Failed to fetch recent audit logs")
         raise
+
+
+def insert_candidate(candidate_name: str, party_name: str, symbol_path: str | None = None, status: str = "ACTIVE", db_path: str | Path | None = None) -> int:
+    """Insert a new candidate into candidates table and return candidate_id."""
+    try:
+        with closing(get_connection(db_path)) as connection:
+            cursor = connection.execute(
+                "INSERT INTO candidates (candidate_name, party_name, symbol_path, status) VALUES (?, ?, ?, ?)",
+                (candidate_name, party_name, symbol_path, status)
+            )
+            connection.commit()
+            return int(cursor.lastrowid)
+    except Exception:
+        logger.exception("Failed to insert candidate %s", candidate_name)
+        raise
+
+
+def update_candidate(candidate_id: int, candidate_name: str, party_name: str, symbol_path: str | None = None, status: str = "ACTIVE", db_path: str | Path | None = None) -> bool:
+    """Update an existing candidate's details."""
+    try:
+        with closing(get_connection(db_path)) as connection:
+            cursor = connection.execute(
+                "UPDATE candidates SET candidate_name = ?, party_name = ?, symbol_path = ?, status = ? WHERE candidate_id = ?",
+                (candidate_name, party_name, symbol_path, status, candidate_id)
+            )
+            connection.commit()
+            return cursor.rowcount > 0
+    except Exception:
+        logger.exception("Failed to update candidate %s", candidate_id)
+        raise
+
+
+def delete_candidate(candidate_id: int, db_path: str | Path | None = None) -> bool:
+    """Delete a candidate by ID."""
+    try:
+        with closing(get_connection(db_path)) as connection:
+            cursor = connection.execute("DELETE FROM candidates WHERE candidate_id = ?", (candidate_id,))
+            connection.commit()
+            return cursor.rowcount > 0
+    except Exception:
+        logger.exception("Failed to delete candidate %s", candidate_id)
+        raise
+
+
+def get_candidate_by_id(candidate_id: int, db_path: str | Path | None = None) -> dict[str, Any] | None:
+    """Fetch candidate details by ID."""
+    try:
+        with closing(get_connection(db_path)) as connection:
+            row = connection.execute("SELECT * FROM candidates WHERE candidate_id = ?", (candidate_id,)).fetchone()
+            return dict(row) if row is not None else None
+    except Exception:
+        logger.exception("Failed to fetch candidate %s", candidate_id)
+        raise
+
+
+def get_all_candidates(db_path: str | Path | None = None) -> list[dict[str, Any]]:
+    """Fetch all candidates from database."""
+    try:
+        with closing(get_connection(db_path)) as connection:
+            rows = connection.execute("SELECT * FROM candidates ORDER BY candidate_id").fetchall()
+            return [dict(row) for row in rows]
+    except Exception:
+        logger.exception("Failed to fetch candidates")
+        raise
+
+
+def update_voter(old_rfid_id: str, new_rfid_id: str, name: str, fingerprint_id: int, has_voted: int, db_path: str | Path | None = None) -> bool:
+    """Update an existing voter's details and cascade RFID modifications."""
+    try:
+        with closing(get_connection(db_path)) as connection:
+            connection.execute("BEGIN TRANSACTION")
+            try:
+                if old_rfid_id != new_rfid_id:
+                    connection.execute("UPDATE votes SET voter_id = ? WHERE voter_id = ?", (new_rfid_id, old_rfid_id))
+                    connection.execute("UPDATE vote_sequence SET voter_id = ? WHERE voter_id = ?", (new_rfid_id, old_rfid_id))
+                
+                cursor = connection.execute(
+                    "UPDATE voters SET rfid_id = ?, name = ?, fingerprint_id = ?, has_voted = ? WHERE rfid_id = ?",
+                    (new_rfid_id, name, fingerprint_id, has_voted, old_rfid_id)
+                )
+                connection.commit()
+                return cursor.rowcount > 0
+            except Exception:
+                connection.rollback()
+                raise
+    except Exception:
+        logger.exception("Failed to update voter %s", old_rfid_id)
+        raise
+
+
+def delete_voter(rfid_id: str, db_path: str | Path | None = None) -> bool:
+    """Delete a voter by RFID ID, clearing historical sequences and votes."""
+    try:
+        with closing(get_connection(db_path)) as connection:
+            connection.execute("BEGIN TRANSACTION")
+            try:
+                connection.execute("DELETE FROM votes WHERE voter_id = ?", (rfid_id,))
+                connection.execute("DELETE FROM vote_sequence WHERE voter_id = ?", (rfid_id,))
+                cursor = connection.execute("DELETE FROM voters WHERE rfid_id = ?", (rfid_id,))
+                connection.commit()
+                return cursor.rowcount > 0
+            except Exception:
+                connection.rollback()
+                raise
+    except Exception:
+        logger.exception("Failed to delete voter %s", rfid_id)
+        raise
+
+
+def bulk_insert_voters(voters_list: list[dict[str, Any]], db_path: str | Path | None = None) -> int:
+    """Bulk insert voter records inside a single transaction. Returns success count."""
+    inserted_count = 0
+    try:
+        with closing(get_connection(db_path)) as connection:
+            for v in voters_list:
+                try:
+                    rfid = v["rfid_id"]
+                    name = v["name"]
+                    fingerprint = v["fingerprint_id"]
+                    has_voted = v.get("has_voted", 0)
+                    connection.execute(
+                        "INSERT INTO voters (rfid_id, name, fingerprint_id, has_voted, registered_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                        (rfid, name, fingerprint, has_voted)
+                    )
+                    inserted_count += 1
+                except sqlite3.IntegrityError:
+                    pass
+            connection.commit()
+            return inserted_count
+    except Exception:
+        logger.exception("Failed bulk inserting voters")
+        raise
+
+
+def get_all_admins(db_path: str | Path | None = None) -> list[dict[str, Any]]:
+    """Fetch all admin accounts."""
+    try:
+        with closing(get_connection(db_path)) as connection:
+            rows = connection.execute("SELECT admin_id, username, role, status, created_at FROM admins ORDER BY username").fetchall()
+            return [dict(row) for row in rows]
+    except Exception:
+        logger.exception("Failed to fetch admin accounts")
+        raise
+
+
+def update_admin_role_and_status(username: str, role: str, status: str, db_path: str | Path | None = None) -> bool:
+    """Update admin's role and enabled status."""
+    try:
+        with closing(get_connection(db_path)) as connection:
+            cursor = connection.execute(
+                "UPDATE admins SET role = ?, status = ? WHERE username = ?",
+                (role, status, username)
+            )
+            connection.commit()
+            return cursor.rowcount > 0
+    except Exception:
+        logger.exception("Failed to update admin role and status for %s", username)
+        raise
+
+
+def delete_admin(username: str, db_path: str | Path | None = None) -> bool:
+    """Delete an admin account."""
+    try:
+        with closing(get_connection(db_path)) as connection:
+            cursor = connection.execute("DELETE FROM admins WHERE username = ?", (username,))
+            connection.commit()
+            return cursor.rowcount > 0
+    except Exception:
+        logger.exception("Failed to delete admin %s", username)
+        raise
+

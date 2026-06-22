@@ -51,6 +51,7 @@ class MQTTVoteHandler:
         self.client = None
         self._monitor_stop = threading.Event()
         self._monitor_thread: threading.Thread | None = None
+        self._message_timestamps: list[float] = []
         if mqtt is None:
             return
         self.client = mqtt.Client(client_id=self.client_id)
@@ -67,11 +68,19 @@ class MQTTVoteHandler:
         client.subscribe(MQTT_AUTH_REQUEST_TOPIC, qos=MQTT_QOS)
         client.subscribe(MQTT_VOTE_SUBMIT_TOPIC, qos=MQTT_QOS)
         client.subscribe("voting/system/health", qos=MQTT_QOS)
+        client.subscribe("voting/booth/heartbeat", qos=MQTT_QOS)
 
     def _on_disconnect(self, client: Any, userdata: Any, rc: int) -> None:
         logger.warning("MQTT disconnected (rc=%s). Auto-reconnect will be attempted.", rc)
 
+    def get_mqtt_message_rate(self) -> float:
+        """Calculate the average incoming messages per second over a 10s window."""
+        now = time.time()
+        self._message_timestamps = [t for t in self._message_timestamps if now - t <= 10]
+        return round(len(self._message_timestamps) / 10.0, 2)
+
     def _on_message(self, client: Any, userdata: Any, message: Any) -> None:
+        self._message_timestamps.append(time.time())
         topic = str(message.topic)
         try:
             payload = json.loads(message.payload.decode("utf-8"))
@@ -87,6 +96,10 @@ class MQTTVoteHandler:
             return
         if topic == "voting/system/health":
             self._handle_health(payload)
+            return
+        if topic == "voting/booth/heartbeat":
+            self._handle_booth_heartbeat(payload)
+            return
 
     def _handle_auth_request(self, payload: dict[str, Any]) -> None:
         request_id = str(payload.get("request_id", ""))
@@ -115,6 +128,7 @@ class MQTTVoteHandler:
             "booth_id": booth_id,
             "registered": True,
             "verified": verified,
+            "has_voted": bool(voter["has_voted"]),
             "name": voter["name"],
             "fingerprint_id": voter["fingerprint_id"],
             "message": "Authentication success" if verified else "Fingerprint mismatch",
@@ -143,6 +157,38 @@ class MQTTVoteHandler:
         self._last_health_seen[key] = time.time()
         update_component_status(component=component, status=status, message="heartbeat over mqtt")
         emit_system_health_update({"component": component, "status": status})
+
+    def _handle_booth_heartbeat(self, payload: dict[str, Any]) -> None:
+        booth_id = str(payload.get("booth_id", "unknown"))
+        wifi_status = str(payload.get("wifi_status", "DISCONNECTED"))
+        mqtt_status = str(payload.get("mqtt_status", "DISCONNECTED"))
+        buffered = payload.get("buffered_votes", 0)
+        free_heap = payload.get("free_heap", 0)
+        version = str(payload.get("firmware_version", "v1.0.0"))
+
+        status = "ONLINE" if (wifi_status == "CONNECTED" and mqtt_status == "CONNECTED") else "OFFLINE"
+        msg = f"FW: {version} | Heap: {free_heap} B | Buffered: {buffered}"
+
+        component = f"booth:{booth_id}"
+        self._last_health_seen[component] = time.time()
+        update_component_status(component=component, status=status, message=msg)
+        
+        # Prepare rich health update event
+        health_payload = {
+            "component": component,
+            "status": status,
+            "wifi_status": wifi_status,
+            "mqtt_status": mqtt_status,
+            "buffered_votes": buffered,
+            "free_heap": free_heap,
+            "firmware_version": version,
+            "fsm_state": payload.get("fsm_state", "UNKNOWN"),
+            "current_voter": payload.get("current_voter", ""),
+            "rfid_status": payload.get("rfid_status", ""),
+            "fingerprint_status": payload.get("fingerprint_status", ""),
+            "lcd_status": payload.get("lcd_status", "")
+        }
+        emit_system_health_update(health_payload)
 
     def _health_monitor_loop(self) -> None:
         timeout = float(HEALTH_OFFLINE_TIMEOUT_SECONDS)

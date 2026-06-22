@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>SecureVoteX™ - Administration Login</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#080E1A',
+                        darkcard: 'rgba(17, 24, 39, 0.7)',
+                        darkborder: 'rgba(255, 255, 255, 0.08)',
+                        accentblue: '#3B82F6',
+                        successgreen: '#10B981',
+                        warningyellow: '#F59E0B',
+                        dangered: '#EF4444',
+                        textlight: '#F9FAFB',
+                        textmuted: '#9CA3AF'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #080E1A;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.08) 0%, transparent 45%);
+            background-attachment: fixed;
+            background-size: cover;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+
+        /* Ambient floating light animation */
+        .ambient-glow {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+            filter: blur(40px);
+            z-index: 0;
+            animation: floatGlow 12s infinite alternate ease-in-out;
+        }
+
+        .ambient-glow-2 {
+            position: absolute;
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
+            filter: blur(45px);
+            z-index: 0;
+            animation: floatGlow2 15s infinite alternate-reverse ease-in-out;
+        }
+
+        @keyframes floatGlow {
+            0% { transform: translate(-10%, -10%) scale(1); }
+            100% { transform: translate(20%, 30%) scale(1.2); }
+        }
+
+        @keyframes floatGlow2 {
+            0% { transform: translate(10%, 20%) scale(1.1); }
+            100% { transform: translate(-30%, -20%) scale(0.9); }
+        }
+
+        .glass-panel {
+            background: rgba(13, 20, 35, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(20px) saturate(120%);
+            -webkit-backdrop-filter: blur(20px) saturate(120%);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 relative">
+
+    <!-- Background Glow Effects -->
+    <div class="ambient-glow top-1/4 left-1/4"></div>
+    <div class="ambient-glow-2 bottom-1/4 right-1/4"></div>
+
+    <div class="w-full max-w-md z-10">
+        <!-- Logo and Branding Header -->
+        <div class="text-center mb-6">
+            <div class="inline-flex h-14 w-14 rounded-2xl bg-accentblue/10 border border-accentblue/30 items-center justify-center text-accentblue mb-3 shadow-lg shadow-accentblue/10">
+                <i class="fa-solid fa-shield-halved text-2xl animate-pulse"></i>
+            </div>
+            <h1 class="text-3xl font-extrabold tracking-tight text-white flex items-center justify-center gap-1.5">
+                SecureVoteX<span class="text-accentblue font-medium text-xs align-super">™</span>
+            </h1>
+            <p class="text-textmuted text-sm mt-1">Enterprise Election Control Center</p>
+        </div>
+
+        <!-- Glass Login Card -->
+        <div class="glass-panel rounded-3xl p-8 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accentblue via-successgreen to-accentblue"></div>
+
+            <h2 class="text-lg font-bold text-white mb-6">Administrator Access</h2>
+
+            <!-- Error Notice Box -->
+            <div id="error-box" class="hidden mb-4 p-3 rounded-lg bg-dangered/15 border border-dangered/30 text-dangered text-xs flex items-center gap-2">
+                <i class="fa-solid fa-circle-exclamation text-sm"></i>
+                <span id="error-message">Invalid credentials provided.</span>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-5">
+                <div>
+                    <label for="username" class="block text-xs font-semibold text-textmuted mb-1.5 uppercase tracking-wider">Username</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-textmuted">
+                            <i class="fa-solid fa-user text-sm"></i>
+                        </div>
+                        <input type="text" id="username" required
+                            class="w-full bg-darkbg/80 border border-darkborder rounded-xl py-2.5 pl-10 pr-4 text-white text-sm placeholder:text-textmuted/40 focus:border-accentblue focus:outline-none focus:ring-1 focus:ring-accentblue transition-all"
+                            placeholder="Enter administrator ID">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-xs font-semibold text-textmuted mb-1.5 uppercase tracking-wider">Password</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-textmuted">
+                            <i class="fa-solid fa-lock text-sm"></i>
+                        </div>
+                        <input type="password" id="password" required
+                            class="w-full bg-darkbg/80 border border-darkborder rounded-xl py-2.5 pl-10 pr-4 text-white text-sm placeholder:text-textmuted/40 focus:border-accentblue focus:outline-none focus:ring-1 focus:ring-accentblue transition-all"
+                            placeholder="Enter account password">
+                    </div>
+                </div>
+
+                <!-- Remember Me & Reset Link -->
+                <div class="flex items-center justify-between text-xs">
+                    <label class="flex items-center gap-2 text-textmuted cursor-pointer select-none">
+                        <input type="checkbox" id="remember" class="accent-accentblue h-4 w-4 rounded border-darkborder bg-darkbg text-accentblue focus:ring-0 cursor-pointer">
+                        Remember Session
+                    </label>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="btn-submit"
+                    class="w-full bg-accentblue hover:bg-blue-600 text-white font-bold py-2.5 rounded-xl transition-all shadow-lg shadow-accentblue/20 flex items-center justify-center gap-2 text-sm">
+                    <i class="fa-solid fa-right-to-bracket"></i> Authenticate Credentials
+                </button>
+            </form>
+        </div>
+
+        <div class="text-center mt-6 text-[11px] text-textmuted/50">
+            Powered by IoT Secure Smart Voting System &copy; 2026. Cryptographic Auditing Policy Active.
+        </div>
+    </div>
+
+    <!-- Login Handler Script -->
+    <script>
+        async function handleLogin(e) {
+            e.preventDefault();
+            const errorBox = document.getElementById('error-box');
+            const errorMsg = document.getElementById('error-message');
+            const btnSubmit = document.getElementById('btn-submit');
+            
+            errorBox.classList.add('hidden');
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Authenticating...';
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const remember = document.getElementById('remember').checked;
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ username, password, remember })
+                });
+                
+                const result = await response.json();
+                if (response.ok && result.status === 'success') {
+                    // Redirect to home dashboard
+                    window.location.href = '/';
+                } else {
+                    errorMsg.textContent = result.message || 'Verification failed. Try again.';
+                    errorBox.classList.remove('hidden');
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Authenticate Credentials';
+                }
+            } catch (err) {
+                console.error(err);
+                errorMsg.textContent = 'Server connection failed. Verify broker or network.';
+                errorBox.classList.remove('hidden');
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Authenticate Credentials';
+            }
+        }
+    </script>
+</body>
+</html>

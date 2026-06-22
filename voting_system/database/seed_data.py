@@ -114,22 +114,46 @@ def seed_demo_voters(db_path: str | Path | None = None) -> int:
     # Ensure default admin exists (idempotent)
     try:
         from contextlib import closing
+        import bcrypt
 
         password = "admin123"
-        password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        # Generate secure bcrypt password hash
+        password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         with closing(get_connection(target_db_path)) as conn:
-            conn.execute(
-                "INSERT OR IGNORE INTO admins (username, password_hash, role, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
-                ("admin", password_hash, "SUPER_ADMIN"),
-            )
-            conn.commit()
-            row = conn.execute("SELECT username, role FROM admins WHERE username = ?", ("admin",)).fetchone()
-            if row:
-                print(f"Ensured admin: {row['username']} | role={row['role']}")
+            # Check if admin already exists
+            row = conn.execute("SELECT password_hash FROM admins WHERE username = ?", ("admin",)).fetchone()
+            if row is None:
+                conn.execute(
+                    "INSERT INTO admins (username, password_hash, role, status, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                    ("admin", password_hash, "SUPER_ADMIN", "ACTIVE"),
+                )
+                conn.commit()
+                print("Created default admin 'admin' with bcrypt password hashing")
             else:
-                print("Failed to ensure default admin 'admin'")
+                print("Default admin 'admin' already exists")
     except Exception:
         logger.exception("Failed to create default admin")
+
+    # Ensure default candidates exist (idempotent)
+    try:
+        from contextlib import closing
+        with closing(get_connection(target_db_path)) as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO candidates (candidate_id, candidate_name, party_name, symbol_path, status) VALUES (?, ?, ?, ?, ?)",
+                (1, "Candidate A", "Democratic Party", "/static/uploads/symbols/candidate_a.png", "ACTIVE")
+            )
+            conn.execute(
+                "INSERT OR IGNORE INTO candidates (candidate_id, candidate_name, party_name, symbol_path, status) VALUES (?, ?, ?, ?, ?)",
+                (2, "Candidate B", "Republican Party", "/static/uploads/symbols/candidate_b.png", "ACTIVE")
+            )
+            conn.execute(
+                "INSERT OR IGNORE INTO candidates (candidate_id, candidate_name, party_name, symbol_path, status) VALUES (?, ?, ?, ?, ?)",
+                (3, "Candidate C", "Independent Party", "/static/uploads/symbols/candidate_c.png", "ACTIVE")
+            )
+            conn.commit()
+            print("Ensured default candidates A, B, and C exist in database")
+    except Exception:
+        logger.exception("Failed to seed default candidates")
 
     # Ensure default election exists (idempotent)
     try:

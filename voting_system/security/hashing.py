@@ -69,7 +69,7 @@ def generate_hmac_signature(payload: dict, secret_key: str) -> str:
     """Generate an HMAC-SHA256 signature for a vote payload.
 
     The signature covers the canonical fields: voter_id, candidate, booth_id,
-    timestamp and sequence_number. The caller must ensure these fields exist.
+    timestamp (or uptime_seconds) and sequence_number. The caller must ensure these fields exist.
 
     Parameters:
         payload: The vote payload dictionary.
@@ -78,11 +78,14 @@ def generate_hmac_signature(payload: dict, secret_key: str) -> str:
     Returns:
         Hexadecimal HMAC-SHA256 signature string.
     """
+    time_val = str(payload.get("timestamp", ""))
+    if not time_val and "uptime_seconds" in payload:
+        time_val = str(payload.get("uptime_seconds", ""))
     parts = [
         str(payload.get("voter_id", "")),
         str(payload.get("candidate", "")),
         str(payload.get("booth_id", "")),
-        str(payload.get("timestamp", "")),
+        time_val,
         str(payload.get("sequence_number", "")),
     ]
     message = "|".join(parts).encode("utf-8")
